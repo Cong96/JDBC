@@ -1,0 +1,16 @@
+字节：
+boolean 布尔型 1/8
+byte 字节类型 1
+char 字符型 2 一个字符能存储一个中文汉字
+short 短整型 2
+int 整数类型 4
+float 浮点类型(单精度) 4
+long 长整形 8
+double 双精度类型(双精度) 8
+java中默认的整数类型是int类型
+如果要定义成long类型 ,后面加上l 或L
+默认的浮点型也是双精度浮点，如果要定义成float，后面加上f或F
+byte->short,char->int ->long
+float->double
+int->float
+long->double

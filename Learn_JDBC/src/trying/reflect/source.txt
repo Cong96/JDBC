@@ -1,0 +1,145 @@
+    private final static Class[] constructorParams =
+	{ InvocationHandler.class };
+ 
+ public static Object newProxyInstance(ClassLoader loader,
+					  Class<?>[] interfaces,
+					  InvocationHandler h)
+	throws IllegalArgumentException
+    {
+	if (h == null) {
+	    throw new NullPointerException();
+	}
+
+	/*
+	 * Look up or generate the designated proxy class.
+	 */
+	Class cl = getProxyClass(loader, interfaces);
+
+	/*
+	 * Invoke its constructor with the designated invocation handler.
+	 */
+	try {
+	//Class :getConstructor方法
+	//public Constructor<T> getConstructor(Class<?>... parameterTypes)
+	/*
+		返回一个 Constructor 对象，它反映此 Class 对象所表示的类的指定公共构造方法。parameterTypes
+		参数是 Class 对象的一个数组，这些 Class 对象按声明顺序标识构造方法的形参类型。
+		如果此 Class 对象表示非静态上下文中声明的内部类，则形参类型作为第一个参数包括显示封闭的实例。 
+                        要反映的构造方法是此 Class 对象所表示的类的公共构造方法，其形参类型与 parameterTypes 所指定的参数类型相匹配。 
+*/
+	    Constructor cons = cl.getConstructor(constructorParams);
+	    return (Object) cons.newInstance(new Object[] { h });
+	} catch (NoSuchMethodException e) {
+	    throw new InternalError(e.toString());
+	} catch (IllegalAccessException e) {
+	    throw new InternalError(e.toString());
+	} catch (InstantiationException e) {
+	    throw new InternalError(e.toString());
+	} catch (InvocationTargetException e) {
+	    throw new InternalError(e.toString());
+	}
+    }
+    =====
+    public static Class<?> getProxyClass(ClassLoader loader,   
+                                         Class<?>... interfaces)  
+    throws IllegalArgumentException  
+    {  
+    // 如果目标类实现的接口数大于65535个则抛出异常（我XX，谁会写这么NB的代码啊？）  
+    if (interfaces.length > 65535) {  
+        throw new IllegalArgumentException("interface limit exceeded");  
+    }  
+  
+    // 声明代理对象所代表的Class对象（有点拗口）  
+    Class proxyClass = null;  
+  
+    String[] interfaceNames = new String[interfaces.length];  
+  
+    Set interfaceSet = new HashSet();   // for detecting duplicates  
+  
+    // 遍历目标类所实现的接口  
+    for (int i = 0; i < interfaces.length; i++) {  
+          
+        // 拿到目标类实现的接口的名称  
+        String interfaceName = interfaces[i].getName();  
+        Class interfaceClass = null;  
+        try {  
+        // 加载目标类实现的接口到内存中  
+        interfaceClass = Class.forName(interfaceName, false, loader);  
+        } catch (ClassNotFoundException e) {  
+        }  
+        if (interfaceClass != interfaces[i]) {  
+        throw new IllegalArgumentException(  
+            interfaces[i] + " is not visible from class loader");  
+        }  
+  
+        // 中间省略了一些无关紧要的代码 .......  
+          
+        // 把目标类实现的接口代表的Class对象放到Set中  
+        interfaceSet.add(interfaceClass);  
+  
+        interfaceNames[i] = interfaceName;  
+    }  
+  
+    // 把目标类实现的接口名称作为缓存（Map）中的key  
+    Object key = Arrays.asList(interfaceNames);  
+  
+    Map cache;  
+      
+    synchronized (loaderToCache) {  
+        // 从缓存中获取cache  
+        cache = (Map) loaderToCache.get(loader);  
+        if (cache == null) {  
+        // 如果获取不到，则新建地个HashMap实例  
+        cache = new HashMap();  
+        // 把HashMap实例和当前加载器放到缓存中  
+        loaderToCache.put(loader, cache);  
+        }  
+  
+    }  
+  
+    synchronized (cache) {  
+  
+        do {  
+        // 根据接口的名称从缓存中获取对象  
+        Object value = cache.get(key);  
+        if (value instanceof Reference) {  
+            proxyClass = (Class) ((Reference) value).get();  
+        }  
+        if (proxyClass != null) {  
+            // 如果代理对象的Class实例已经存在，则直接返回  
+            return proxyClass;  
+        } else if (value == pendingGenerationMarker) {  
+            try {  
+            cache.wait();  
+            } catch (InterruptedException e) {  
+            }  
+            continue;  
+        } else {  
+            cache.put(key, pendingGenerationMarker);  
+            break;  
+        }  
+        } while (true);  
+    }  
+  
+    try {  
+        // 中间省略了一些代码 .......  
+          
+        // 这里就是动态生成代理对象的最关键的地方  
+        byte[] proxyClassFile = ProxyGenerator.generateProxyClass(  
+            proxyName, interfaces);  
+        try {  
+            // 根据代理类的字节码生成代理类的实例  
+            proxyClass = defineClass0(loader, proxyName,  
+            proxyClassFile, 0, proxyClassFile.length);  
+        } catch (ClassFormatError e) {  
+            throw new IllegalArgumentException(e.toString());  
+        }  
+        }  
+        // add to set of all generated proxy classes, for isProxyClass  
+        proxyClasses.put(proxyClass, null);  
+  
+    }   
+    // 中间省略了一些代码 .......  
+      
+    return proxyClass;  
+    }  
